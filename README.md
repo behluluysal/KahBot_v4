@@ -1,5 +1,5 @@
 # KahBot_v4
-This is a custom discord bot written in Discord.Net C#. Coded for a shutdown of a discord server. What this bot does is start the server shutdown process with /dreamends command and give a date. Bot will send an embded message to the channel and will start the countdown. Embded message will be updated every minute until it reaches 1 minute. After that bot will start to count 5 secods, when timer ends bot automatically call /testfinalact command. This command will start to kick every member randomly end send them a farewell message.
+This is a custom discord bot written in Discord.Net C#. Coded for a shutdown of a discord server. What this bot does is start the server shutdown process with /dreamends command and give a date. Bot will send an embded message to the channel and will start the countdown. Embded message will be updated every minute until it reaches 1 minute. After that bot will start to count 5 secods, when timer ends bot automatically call /testfinalact command. This command will start to kick every member randomly and send them a farewell message.
 
 Commands:
 - /dreamends (DateTime time, string reason) : Starts the countdown for server shutdown
