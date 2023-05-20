@@ -23,7 +23,7 @@ public class LoggingService
             Console.WriteLine(cmdException);
         }
         else
-            Console.WriteLine($"[General/{message.Severity}] {message}");
+            Console.WriteLine($"[{message.Source}/{message.Severity}] {message}");
 
         return Task.CompletedTask;
     }

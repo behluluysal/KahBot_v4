@@ -1,19 +1,8 @@
-﻿using DataStore.EF.Data;
-using Discord;
-using Discord.Commands;
+﻿using Discord;
 using Discord.Interactions;
-using Discord.WebSocket;
 using Core.Models;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Runtime.CompilerServices;
-using System.Text;
-using System.Threading.Channels;
-using System.Threading.Tasks;
 using KahBot_v4.Controllers;
 using KahBot_v4.Helpers;
-using Microsoft.IdentityModel.Logging;
 using Microsoft.Extensions.Configuration;
 
 namespace KahBot_v4.Modules
@@ -24,45 +13,50 @@ namespace KahBot_v4.Modules
         private readonly CountDownTimerHelper _countDownTimerHelper;
         private readonly IConfigurationRoot _configuration;
         private readonly ServerGeneralHelper _serverGeneralHelper;
+        private readonly ResourceHelper _resourceHelper;
+        private readonly ulong _adminId;
         public SlashCommands(CounterController counterController, 
             CountDownTimerHelper countDownTimerHelper, 
-            IConfigurationRoot configuration
-            ,ServerGeneralHelper serverGeneralHelper)
+            IConfigurationRoot configuration,
+            ServerGeneralHelper serverGeneralHelper, 
+            ResourceHelper resourceHelper)
         {
             _counterController = counterController;
             _countDownTimerHelper = countDownTimerHelper;
             _configuration = configuration;
             _serverGeneralHelper = serverGeneralHelper;
+            _resourceHelper = resourceHelper;
+            _adminId = ulong.Parse(configuration.GetSection("AdminID").Value ?? "0");
         }
 
         [SlashCommand("dreamends", "Going to the world ending?")]
         public async Task StartCounterAsync(DateTime endDate, string reason)
         {
-            // If not admin, don't execute
-            string? adminId = _configuration.GetSection("AdminID").Value;
-            if (!string.IsNullOrEmpty(adminId)
-                && Context.User.Id != ulong.Parse(adminId))
+            if (Context.User.Id != _adminId)
             {
-                await RespondAsync("Call admin please");
+                await RespondAsync(_resourceHelper.GetString(ResourceFiles.GeneralMessages, GeneralMessages.AdminOnly.ToString()));
+                return;
             }
 
             if (endDate.CompareTo(DateTime.Now) <= 0)
             {
-                await RespondAsync("Cant count forwards");
+                await RespondAsync(_resourceHelper.GetString(ResourceFiles.GeneralMessages, GeneralMessages.PastDateError.ToString()));
+                return;
             }
 
 
             // Reply to interaction
             AllowedMentions mentions = new AllowedMentions();
             mentions.AllowedTypes = AllowedMentionTypes.Everyone;
-            await RespondAsync(text: $"CountDown started for final act! <#{(_configuration.GetSection("Channels:Announcements").Value)}> @everyone", allowedMentions: mentions);
+            await RespondAsync(text: $"{_resourceHelper.GetString(ResourceFiles.GeneralMessages, GeneralMessages.CountDownForFinalActStarted.ToString())} " +
+                $"<#{(_configuration.GetSection("Channels:Announcements").Value)}> @everyone", allowedMentions: mentions);
 
             // Send the first message to hold the message as a variable to be able to edit again.
             double timeLeftMillis = endDate.Subtract(DateTime.Now).TotalMilliseconds;
             
 
             // Send a dummy text to get channel id and message id
-            IUserMessage counterMessage = await ReplyAsync("CountDown timer is preparing...");
+            IUserMessage counterMessage = await ReplyAsync(_resourceHelper.GetString(ResourceFiles.GeneralMessages, GeneralMessages.CountDownTimerPreparing.ToString()));
 
             //Fill model
             Counter counter = new Counter
@@ -76,7 +70,7 @@ namespace KahBot_v4.Modules
             };
             if (!await _counterController.Add(counter))
             {
-                await counterMessage.ModifyAsync(x => { x.Content = "Problem at saving data to database"; });
+                await counterMessage.ModifyAsync(x => { x.Content = _resourceHelper.GetString(ResourceFiles.GeneralMessages, GeneralMessages.DbCrudProblem.ToString()); });
                 return;
             };
 
@@ -90,14 +84,14 @@ namespace KahBot_v4.Modules
             //Send private message to notify the requester user
             Embed pmToRequesterMessageBody = new EmbedBuilder()
                     .WithAuthor(Context.User)
-                    .WithTitle("CountDown Timer Request Info")
-                    .WithDescription("Your countdown timer request is taken by KahBot_v4")
+                    .WithTitle(_resourceHelper.GetString(ResourceFiles.GeneralMessages, GeneralMessages.TimerInfo.ToString()))
+                    .WithDescription(_resourceHelper.GetString(ResourceFiles.GeneralMessages, GeneralMessages.RequestTaken.ToString()))
 
-                    .AddField("Requester: ", $"{Context.User}")
-                    .AddField("Reason: ", $"{reason}")
-                    .AddField("Target Date: ", $"{endDate}")
+                    .AddField(_resourceHelper.GetString(ResourceFiles.GeneralMessages, GeneralMessages.Requester.ToString()), Context.User)
+                    .AddField(_resourceHelper.GetString(ResourceFiles.GeneralMessages, GeneralMessages.Reason.ToString()), reason)
+                    .AddField(_resourceHelper.GetString(ResourceFiles.GeneralMessages, GeneralMessages.TargetDate.ToString()), endDate)
 
-                    .WithFooter(footer => footer.Text = "Fun fact: ")
+                    .WithFooter(footer => footer.Text = _resourceHelper.GetString(ResourceFiles.GeneralMessages, GeneralMessages.FunFact.ToString()))
                     .WithColor(Color.Green)
                     .WithCurrentTimestamp()
                     .Build();
@@ -107,11 +101,10 @@ namespace KahBot_v4.Modules
         [SlashCommand("testfinalact", "test final act")]
         public async Task TestFinalAct()
         {
-            string? adminId = _configuration.GetSection("AdminID").Value;
-            if (!string.IsNullOrEmpty(adminId)
-                && Context.User.Id != ulong.Parse(adminId))
+            if (Context.User.Id != _adminId)
             {
-                await RespondAsync("Call admin please");
+                await RespondAsync(_resourceHelper.GetString(ResourceFiles.GeneralMessages, GeneralMessages.AdminOnly.ToString()));
+                return;
             }
             await _serverGeneralHelper.StartFinalAct(Context.Client, Context.Channel.Id);
         }

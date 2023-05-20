@@ -17,6 +17,7 @@ namespace KahBot_v4.Helpers
         private readonly LoggingService _logger;
         private readonly DiscordSocketClient _client;
         private ServerGeneralHelperModel _serverGeneralHelperModel;
+        private readonly ResourceHelper _resourceHelper;
 
         #region [ Inline Class ]
         private class ServerGeneralHelperModel
@@ -45,12 +46,13 @@ namespace KahBot_v4.Helpers
         }
         #endregion
 
-        public ServerGeneralHelper(IConfigurationRoot configuration, LoggingService logger, DiscordSocketClient client)
+        public ServerGeneralHelper(IConfigurationRoot configuration, LoggingService logger, DiscordSocketClient client, ResourceHelper resourceHelper)
         {
             _configuration = configuration;
             _logger = logger;
             _client = client;
             _serverGeneralHelperModel = new ServerGeneralHelperModel();
+            _resourceHelper = resourceHelper;
         }
 
         #region [ Public Methods ]
@@ -61,7 +63,10 @@ namespace KahBot_v4.Helpers
         public async Task StartFinalAct(DiscordSocketClient client, ulong timerChannelId)
         {
             if (_serverGeneralHelperModel.Client == null || _serverGeneralHelperModel.Guild == null)
+            {
+                await _logger.LogAsync(new(LogSeverity.Error, "Error", "On executing StartFinalAct: Client or Guild is null, check settings", null));
                 return;
+            }
 
             IGuildUser[] users = _serverGeneralHelperModel.Guild.GetUsersAsync().Result.ToArray();
             
@@ -70,7 +75,11 @@ namespace KahBot_v4.Helpers
             totalUsers -= 1; // -1 because admin can't be kicked
             var timerRequestedChannel = await _serverGeneralHelperModel.Guild.GetChannelAsync(timerChannelId) as IMessageChannel;
 
-            var finalActGeneralMessage = await timerRequestedChannel.SendMessageAsync(text:"KahBot FinalAct activated!", embed: PrepareFinalActGeneralMessage(kickedUsers, totalUsers));
+            var finalActGeneralMessage = await timerRequestedChannel
+                .SendMessageAsync(
+                    text: _resourceHelper.GetString(ResourceFiles.GeneralMessages, GeneralMessages.FinalActActivated.ToString()), 
+                    embed: PrepareFinalActGeneralMessage(kickedUsers, totalUsers)
+                );
             List<IGuildUser> randomUserList = users.OrderBy(arg => Guid.NewGuid()).ToList();
 
             
@@ -87,8 +96,8 @@ namespace KahBot_v4.Helpers
 
                     Embed kickUserMessage = new EmbedBuilder()
                        .WithAuthor(_serverGeneralHelperModel.KahBot)
-                       .WithTitle("Farewell")
-                       .WithDescription($"<@{user.Id}> named user kicked at {DateTime.Now} by FinalAct command. Farewell!")
+                       .WithTitle(_resourceHelper.GetString(ResourceFiles.GeneralMessages, GeneralMessages.Farewell.ToString()))
+                       .WithDescription(string.Format(_resourceHelper.GetString(ResourceFiles.GeneralMessages, GeneralMessages.LogChannelLeaveMessage.ToString()), user.Id, DateTime.Now))
                        .WithColor(Color.Red)
                        .WithCurrentTimestamp()
                        .Build();
@@ -121,6 +130,9 @@ namespace KahBot_v4.Helpers
                 string? adminId = _configuration.GetSection("AdminID").Value;
                 string? kahbotId = _configuration.GetSection("FinalAct:BotId").Value;
 
+                ServerGeneralHelperModel model = new ServerGeneralHelperModel();
+                _serverGeneralHelperModel = model;
+
                 #pragma warning disable CS8601, CS8604, CS8600
                 IMessageChannel finalActLogChannel = _client.GetChannel(ulong.Parse(finalActLogChannelId)) as IMessageChannel;
                 IGuild guild = _client.GetGuild(ulong.Parse(guildId));
@@ -131,32 +143,42 @@ namespace KahBot_v4.Helpers
                 if (finalActLogChannel == null || guild == null || admin == null || kahbot == null)
                     throw new NullReferenceException("FinalAct:GuildId or FinalAct:LogChannel was null");
 
-                ServerGeneralHelperModel model = new ServerGeneralHelperModel(_client, finalActLogChannel, guild, admin, kahbot);
+                model = new ServerGeneralHelperModel(_client, finalActLogChannel, guild, admin, kahbot);
                 _serverGeneralHelperModel = model;
             }
             catch (Exception e)
             {
                 await _logger.LogAsync(new(LogSeverity.Error, "ServerGeneralHelper -> Initialize", e.Message, e));
-                throw;
             }
+        }
+
+        public bool CheckRequirements()
+        {
+            return (_serverGeneralHelperModel == null
+                || _serverGeneralHelperModel.Guild == null
+                || _serverGeneralHelperModel.FinalActLogChannel == null
+                || _serverGeneralHelperModel.KahBot == null
+                || _serverGeneralHelperModel.Admin == null);
         }
 
         #endregion
         #region [ Private Methods ]
 
         /// <summary>
-        /// Prepares embed message to send each user in pm for saying thank you
+        /// Prepares embed farewell message to send each user in pm from bot
         /// </summary>
         /// <param name="user"></param>
         private async Task SendFarewellMessage(IGuildUser user)
         {
             Embed pmToUserMessageBody = new EmbedBuilder()
                     .WithAuthor(_serverGeneralHelperModel.KahBot)
-                    .WithTitle("WithTitle")
-                    .WithDescription("WithDescription...")
+                    .WithTitle(_resourceHelper.GetString(ResourceFiles.GeneralMessages, GeneralMessages.BotPmTitle.ToString()))
+                    .WithDescription(_resourceHelper.GetString(ResourceFiles.GeneralMessages, GeneralMessages.BotPmBody.ToString()))
 
-                    .AddField("message:", $"message")
-                    .WithFooter(footer => footer.Text = "footer...")
+                    .AddField(
+                        $"{_resourceHelper.GetString(ResourceFiles.GeneralMessages, GeneralMessages.BotPmCustomFieldTitle.ToString())} :",
+                        $"{_resourceHelper.GetString(ResourceFiles.GeneralMessages, GeneralMessages.BotPmCustomFieldBody.ToString())}")
+                    .WithFooter(footer => footer.Text = _resourceHelper.GetString(ResourceFiles.GeneralMessages, GeneralMessages.BotPmFooter.ToString()))
                     .WithColor(Color.Green)
                     .WithCurrentTimestamp()
                     .Build();
@@ -164,15 +186,15 @@ namespace KahBot_v4.Helpers
         }
 
         /// <summary>
-        /// Prepares embed message to send each user in pm about server shutting down
+        /// Prepares embed farewell message to send each user in pm from admin
         /// </summary>
         /// <param name="user"></param>
         private async Task SendServerShutDownMessage(IGuildUser user)
         {
             Embed pmToUserMessageBody = new EmbedBuilder()
                     .WithAuthor(_serverGeneralHelperModel.Admin)
-                    .WithTitle("WithTitle")
-                    .WithDescription("WithDescription.")
+                    .WithTitle(_resourceHelper.GetString(ResourceFiles.GeneralMessages, GeneralMessages.AdminPmTitle.ToString()))
+                    .WithDescription(_resourceHelper.GetString(ResourceFiles.GeneralMessages, GeneralMessages.AdminPmBody.ToString()))
                     .WithColor(Color.Red)
                     .WithCurrentTimestamp()
                     .Build();
@@ -183,8 +205,8 @@ namespace KahBot_v4.Helpers
         {
             Embed kickUserMessage = new EmbedBuilder()
                   .WithAuthor(_serverGeneralHelperModel.KahBot)
-                  .WithTitle("WithTitle")
-                  .WithDescription($"{kickedUserCount}/{totalUsers} users kicked.")
+                  .WithTitle(_resourceHelper.GetString(ResourceFiles.GeneralMessages, GeneralMessages.KickedUserCounterTitle.ToString()))
+                  .WithDescription($"{kickedUserCount}/{totalUsers} {_resourceHelper.GetString(ResourceFiles.GeneralMessages, GeneralMessages.UsersKicked.ToString())}.")
                   .WithColor(Color.Blue)
                   .WithCurrentTimestamp()
                   .Build();

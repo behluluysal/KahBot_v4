@@ -24,7 +24,7 @@ namespace DataStore.EF.Data
         public KahBotDbContext CreateDbContext(string[] args)
         {
             var optionsBuilder = new DbContextOptionsBuilder<KahBotDbContext>();
-            optionsBuilder.UseSqlServer("Data Source=.;Initial Catalog=KahBotDb;Integrated Security=True;Connect Timeout=30;Encrypt=False;TrustServerCertificate=False;ApplicationIntent=ReadWrite;MultiSubnetFailover=False");
+            optionsBuilder.UseSqlServer("Data Source=.;Initial Catalog=KahBotDb;Integrated Security=True;Connect Timeout=30;Encrypt=False;Trust Server Certificate=False;Application Intent=ReadWrite;Multi Subnet Failover=False");
             return new KahBotDbContext(optionsBuilder.Options);
         }
         protected override void OnModelCreating(ModelBuilder modelBuilder)

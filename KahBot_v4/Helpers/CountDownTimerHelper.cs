@@ -21,10 +21,12 @@ namespace KahBot_v4.Helpers
         private const int _oneMinuteMillis = 60000;
         private const int _fiveSecondsMilis = 5000;
         private readonly TimeSpan LocalUtcOffset = TimeZoneInfo.Local.GetUtcOffset(DateTime.Now);
-        public CountDownTimerHelper(CounterController counterController, ServerGeneralHelper serverGeneralHelper)
+        private readonly ResourceHelper _resourceHelper;
+        public CountDownTimerHelper(CounterController counterController, ServerGeneralHelper serverGeneralHelper, ResourceHelper resourceHelper)
         {
             _counterController = counterController;
             _serverGeneralHelper = serverGeneralHelper;
+            _resourceHelper = resourceHelper;
         }
 
         #region [ Public Methods ]
@@ -66,21 +68,22 @@ namespace KahBot_v4.Helpers
 
             if(timeLeftMillis < 60000)
             {
-                footerText = "Countdown refreshes every 5 second";
+                footerText = _resourceHelper.GetString(ResourceFiles.GeneralMessages, GeneralMessages.CountDownRefresh5Second.ToString());
             }
             else
             {
-                footerText = "Countdown refreshes every minute";
+                footerText = _resourceHelper.GetString(ResourceFiles.GeneralMessages, GeneralMessages.CountDownRefreshMinute.ToString());
             }
             return new EmbedBuilder()
                     .WithAuthor(counterData.CreatorName)
-                    .WithTitle("Counter")
-                    .WithDescription("This counter is created by KahBot_v4")
+                    .WithTitle(_resourceHelper.GetString(ResourceFiles.GeneralMessages, GeneralMessages.Counter.ToString()))
+                    .WithDescription(_resourceHelper.GetString(ResourceFiles.GeneralMessages, GeneralMessages.CounterKahBot.ToString()))
 
-                    .AddField("Requester: ", $"{(counterData.CreatorName != null ? counterData.CreatorName : "N/A")}")
-                    .AddField("Reason: ", $"{counterData.Reason}")
-                    .AddField("Target Date: ", $"{counterData.EndDate}")
-                    .AddField("Time Left: ", $"{timeLeft} {(isEnded ? "CountDown Finished" : string.Empty)} ")
+                    .AddField($"{_resourceHelper.GetString(ResourceFiles.GeneralMessages, GeneralMessages.Requester.ToString())}: ", $"{(counterData.CreatorName != null ? counterData.CreatorName : "N/A")}")
+                    .AddField($"{_resourceHelper.GetString(ResourceFiles.GeneralMessages, GeneralMessages.Reason.ToString())}: ", $"{counterData.Reason}")
+                    .AddField($"{_resourceHelper.GetString(ResourceFiles.GeneralMessages, GeneralMessages.TargetDate.ToString())}: ", $"{counterData.EndDate}")
+                    .AddField($"{_resourceHelper.GetString(ResourceFiles.GeneralMessages, GeneralMessages.TimeLeft.ToString())}: ", 
+                                $"{timeLeft} {(isEnded ? $"{_resourceHelper.GetString(ResourceFiles.GeneralMessages, GeneralMessages.CountDownFinished.ToString())}" : string.Empty)} ")
 
                     .WithFooter(footer => footer.Text = footerText)
                     .WithColor(Color.Blue)

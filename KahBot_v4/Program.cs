@@ -5,6 +5,7 @@ using Discord.Interactions;
 using Discord.WebSocket;
 using KahBot_v4.Controllers;
 using KahBot_v4.Helpers;
+using KahBot_v4.Middlewares;
 using KahBot_v4.Modules;
 using KahBot_v4.Services;
 using Microsoft.EntityFrameworkCore;
@@ -12,10 +13,13 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Configuration.Json;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
+using Microsoft.VisualBasic;
 using System;
 using System.ComponentModel.Design;
 using System.Reflection;
+using System.Threading.Channels;
 using System.Windows.Input;
+using static Microsoft.EntityFrameworkCore.DbLoggerCategory.Database;
 using static System.Runtime.InteropServices.JavaScript.JSType;
 
 
@@ -35,12 +39,38 @@ async Task RunAsync(string[] args)
     await _serviceProvider.GetRequiredService<CommandHandler>().InstallCommandsAsync();
     await _serviceProvider.GetRequiredService<InteractionHandler>().InitializeAsync();
     _client.Ready += ReadyAsync;
+    _client.InteractionCreated += _serviceProvider.GetRequiredService<InteractionMiddlewares>().HandleInteraction;
 
     await _client.LoginAsync(TokenType.Bot, _config.GetSection("Keys").GetSection("BotKey").Value);
     await _client.StartAsync();
-
+    
     await Task.Delay(Timeout.Infinite);
 
+}
+
+async Task BotReady()
+{
+    ServerGeneralHelper serverGeneralHelper = _serviceProvider.GetService<ServerGeneralHelper>()!;
+
+    string autoCheckRequirementsValue = _config.GetSection("AutoCheckRequirements").Value ?? "false";
+    bool autoCheckRequirements = !string.IsNullOrEmpty(autoCheckRequirementsValue) && Convert.ToBoolean(autoCheckRequirementsValue);
+
+    if (!autoCheckRequirements)
+        return;
+
+    foreach (var guild in _client.Guilds)
+    {
+        SocketTextChannel generalChannel = guild.DefaultChannel as SocketTextChannel;
+
+        if (!serverGeneralHelper.CheckRequirements())
+        {
+            await generalChannel.SendMessageAsync("Bot is now online!");
+        }
+        else
+        {
+            await generalChannel.SendMessageAsync(_serviceProvider.GetService<ResourceHelper>().GetString(ResourceFiles.GeneralMessages, GeneralMessages.CheckRequirements.ToString()));
+        }
+    }
 }
 
 #region [ DI ]
@@ -78,6 +108,9 @@ static ServiceProvider CreateServices()
         .AddSingleton<LoggingService>()
         .AddSingleton<CountDownTimerHelper>()
         .AddSingleton<ServerGeneralHelper>()
+        .AddSingleton<System.Reflection.Assembly>(System.Reflection.Assembly.GetExecutingAssembly())
+        .AddTransient<ResourceHelper>()
+        .AddTransient<InteractionMiddlewares>()
         .AddDbContext<KahBotDbContext>(options =>
         {
             options.UseSqlServer(appsettings.GetConnectionString("DefaultConnection"));
@@ -85,6 +118,7 @@ static ServiceProvider CreateServices()
 
     return collection.BuildServiceProvider();
 }
+
 async Task ReadyAsync()
 {
     _interactionService = new InteractionService(_client);
@@ -92,6 +126,7 @@ async Task ReadyAsync()
     await _interactionService.RegisterCommandsGloballyAsync();
     await _countDownTimerHelper.ContinueUnfinishedCountdownsAsync(_client);
     await _client.SetActivityAsync(new Game("over KahPeler", ActivityType.Watching, ActivityProperties.PartyPrivacyVoiceChannel));
+    await BotReady();
 }
 
 #endregion
